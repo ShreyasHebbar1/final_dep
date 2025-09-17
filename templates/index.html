@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Video Downloader</title>
+    <style>
+        :root { --bg: #0a0a0a; --fg: #f5f5f5; --muted: #aaa; --accent: #ffffff; --border: #222; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+        .container { max-width: 760px; margin: 6vh auto; padding: 24px; }
+        .card { border: 1px solid var(--border); border-radius: 14px; padding: 28px; background: transparent; }
+        h1 { margin: 0 0 8px; font-size: 28px; }
+        p.sub { margin: 0 0 24px; color: var(--muted); }
+        .row { display: grid; grid-template-columns: 1fr 160px; gap: 12px; }
+        input, select { width: 100%; padding: 14px 16px; border: 1px solid var(--border); background: transparent; color: var(--fg); border-radius: 12px; outline: none; }
+        input:focus, select:focus { border-color: var(--accent); }
+        button { padding: 14px 18px; border-radius: 12px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); cursor: pointer; font-weight: 600; transition: transform .08s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease; box-shadow: 0 0 0 rgba(0,0,0,0); }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        button:active { transform: translateY(1px) scale(0.99); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .muted { color: var(--muted); font-size: 14px; margin-top: 8px; }
+        .progress { display:none; margin-top: 18px; font-size: 14px; color: var(--muted); }
+        .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color: var(--fg); border-radius:50%; animation: spin 1s linear infinite; display:inline-block; vertical-align:middle; margin-right:8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .video-info { margin-top: 16px; display:none; }
+        .qualities { margin-top: 12px; display:flex; flex-direction: column; gap:10px; }
+        .q-row { display:flex; align-items:center; justify-content: space-between; padding:12px 14px; border:1px solid var(--border); border-radius:12px; background: rgba(127,127,127,0.05); }
+        .q-left { display:flex; align-items:center; gap:10px; font-weight:600; flex: 1 1 auto; }
+        .q-size { color: var(--muted); font-weight:500; }
+        .q-fps { color: var(--muted); font-weight:500; }
+        .qualities button { padding:10px 14px; border-radius:10px; font-size:14px; background:#d33; border-color:#d33; min-width: 128px; }
+        .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top:12px; }
+        .tab-btn { padding:10px 12px; border-radius:10px; border:1px solid var(--border); background: transparent; color: var(--fg); cursor: pointer; width: 100%; }
+        .tab-btn.active { border-color: var(--fg); background: rgba(127,127,127,0.08); }
+        .embed { margin-top: 16px; aspect-ratio: 16/9; width: 100%; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; position: relative; background: #000; display:flex; align-items:center; justify-content:center; }
+        .embed img { width:100%; height:100%; object-fit:cover; display:block; }
+        .error { margin-top: 14px; color: #d33; font-size: 14px; }
+        .duration { margin-top: 8px; color: var(--muted); font-size: 13px; }
+        footer { margin-top: 36px; color: var(--muted); font-size: 13px; text-align: center; }
+        .quality { display:flex; gap:8px; align-items:center; margin-top:12px; }
+        .quality select { max-width: 180px; }
+        /* Theme toggle removed; default theme is dark */
+        .yt-icon { display:inline-block; width:24px; height:24px; vertical-align:middle; margin-right:8px; }
+        .title { display:flex; align-items:center; gap:8px; }
+        .yt-icon svg { display:block; }
+        .downloads { margin-top: 24px; }
+        #downloads-list { display: flex; flex-direction: column; gap: 12px; }
+        .dl-card { border:1px solid var(--border); border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; background: rgba(127,127,127,0.05); overflow: hidden; }
+        .dl-row { display:flex; align-items:center; justify-content: space-between; gap: 10px; }
+        .dl-left { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+        .dl-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: block; }
+        .dl-status { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: block; }
+        .dl-card, .dl-row, .dl-left, .dl-title, .dl-status { word-break: break-word; }
+        .dl-pct { white-space: nowrap; flex: 0 0 auto; }
+        .progressbar { width:100%; height:10px; border-radius: 999px; background: rgba(127,127,127,0.15); overflow: hidden; border:1px solid var(--border); }
+        .progressbar > span { display:block; height:100%; width:0%; background: linear-gradient(90deg, #d33, #ff6666); transition: width .2s ease; }
+
+        /* Features */
+        .features { margin-top: 32px; }
+        .features h2 { margin: 0 0 12px; font-size: 22px; }
+        .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .feature-card { border:1px solid var(--border); border-radius: 12px; padding: 16px; background: rgba(127,127,127,0.05); display:flex; gap:12px; align-items:flex-start; }
+        .feature-icon { width:32px; height:32px; flex:0 0 32px; color: var(--fg); opacity:.9; }
+        .feature-card h3 { margin: 0 0 6px; font-size: 16px; }
+        .feature-card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+        @media (max-width: 720px) {
+            .container { margin: 2vh auto; padding: 16px; }
+            .card { padding: 18px; }
+            h1 { font-size: 24px; }
+            .row { grid-template-columns: 1fr; gap: 10px; }
+            input, select, button { min-height: 44px; }
+            .tabs { grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+            .qualities { gap: 12px; }
+            .q-row { padding: 12px; }
+            /* Make quality download buttons compact on mobile */
+            .qualities button { width: auto; min-height: 36px; padding: 8px 12px; font-size: 13px; }
+            .embed { margin-top: 12px; }
+            .downloads { margin-top: 20px; }
+            #downloads-list { gap: 10px; }
+            .dl-card { padding: 12px; gap: 10px; }
+            .dl-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+            .features { margin-top: 24px; }
+            .feature-grid { grid-template-columns: 1fr; gap: 10px; }
+        }
+
+    </style>
+    <script>
+        async function postJSON(url, payload) {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const ct = res.headers.get('Content-Type') || '';
+            if (res.ok && ct.startsWith('video/')) { return res; }
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.status === 'error') throw new Error(data.message || 'Request failed');
+            return data;
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename || 'video.mp4';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        async function fetchInfo() {
+            const url = document.getElementById('url').value.trim();
+            const btn = document.getElementById('btn');
+            const err = document.getElementById('error');
+            const prog = document.getElementById('progress');
+            const info = document.getElementById('videoinfo');
+            const qwrap = document.getElementById('qualities');
+            const embed = document.getElementById('embed');
+            err.textContent = '';
+            info.style.display = 'none';
+            qwrap.innerHTML = '';
+            embed.innerHTML = '';
+            if (!url) return;
+            if (!isYouTube(url)) {
+                err.textContent = 'Link not supported';
+                return;
+            }
+            btn.disabled = true; prog.style.display = 'block';
+            startDots('Fetching your video');
+            try {
+                const data = await postJSON('/info', { url });
+                if (data.status === 'success') {
+                    document.getElementById('title').textContent = data.title || 'Video';
+                    document.getElementById('uploader').textContent = data.uploader || '';
+                    // Render HD thumbnail only (no iframe, no yt-dlp thumbs)
+                    const vid = extractVideoId(url);
+                    const thumbs = buildThumbCandidates(vid);
+                    const img = document.createElement('img');
+                    let idx = 0;
+                    function tryNext() {
+                        if (idx >= thumbs.length) return;
+                        img.src = thumbs[idx++];
+                    }
+                    img.addEventListener('error', tryNext);
+                    tryNext();
+                    embed.appendChild(img);
+                    // Duration below thumbnail
+                    const dur = document.getElementById('duration');
+                    if (dur) {
+                        const dstr = formatDuration(data.duration);
+                        dur.textContent = dstr ? ('Duration: ' + dstr) : '';
+                    }
+                    function renderVideoList() {
+                        qwrap.innerHTML = '';
+                        (data.qualities || []).forEach(q => {
+                            const row = document.createElement('div');
+                            row.className = 'q-row';
+                            const left = document.createElement('div');
+                            left.className = 'q-left';
+                            const name = document.createElement('div');
+                            name.textContent = q.label || (q.height ? (q.height + 'p') : 'Best');
+                            const size = document.createElement('div');
+                            size.className = 'q-size';
+                            size.textContent = q.size_bytes ? formatBytes(q.size_bytes) : '';
+                            const fps = document.createElement('div');
+                            fps.className = 'q-fps';
+                            fps.textContent = q.fps ? (q.fps + ' fps') : '';
+                            left.appendChild(name);
+                            left.appendChild(size);
+                            if (fps.textContent) left.appendChild(fps);
+                            const btn = document.createElement('button');
+                            btn.textContent = 'Download ↓';
+                            btn.addEventListener('click', () => downloadQuality(url, q.height ? (q.height + 'p') : 'best'));
+                            row.appendChild(left);
+                            row.appendChild(btn);
+                            qwrap.appendChild(row);
+                        });
+                    }
+
+                    function renderAudioList() {
+                        qwrap.innerHTML = '';
+                        (data.audio_qualities || []).forEach(a => {
+                            const row = document.createElement('div');
+                            row.className = 'q-row';
+                            const left = document.createElement('div');
+                            left.className = 'q-left';
+                            const name = document.createElement('div');
+                            name.textContent = a.label || (a.abr ? (a.abr + ' kbps MP3') : 'Audio MP3');
+                            const size = document.createElement('div');
+                            size.className = 'q-size';
+                            size.textContent = a.size_bytes ? formatBytes(a.size_bytes) : '';
+                            left.appendChild(name);
+                            left.appendChild(size);
+                            const btn = document.createElement('button');
+                            btn.textContent = 'Download ↓';
+                            btn.addEventListener('click', () => downloadAudio(url, a.abr));
+                            row.appendChild(left);
+                            row.appendChild(btn);
+                            qwrap.appendChild(row);
+                        });
+                    }
+
+                    // Tabs
+                    const tabVideo = document.getElementById('tab-video');
+                    const tabAudio = document.getElementById('tab-audio');
+                    function activate(tab) {
+                        tabVideo.classList.toggle('active', tab === 'video');
+                        tabAudio.classList.toggle('active', tab === 'audio');
+                        if (tab === 'video') renderVideoList(); else renderAudioList();
+                    }
+                    tabVideo.onclick = () => activate('video');
+                    tabAudio.onclick = () => activate('audio');
+                    activate('video');
+                    info.style.display = 'block';
+                }
+            } catch (e) {
+                err.textContent = e.message || String(e);
+            } finally {
+                stopDots();
+                btn.disabled = false; prog.style.display = 'none';
+            }
+        }
+
+        function isYouTube(u) {
+            try {
+                const url = new URL(u);
+                const host = (url.hostname || '').toLowerCase();
+                return host.includes('youtube.com') || host.includes('youtu.be');
+            } catch { return false; }
+        }
+
+        function formatBytes(bytes) {
+            const thresh = 1024;
+            if (!bytes || bytes < thresh) return (bytes || 0) + ' B';
+            const units = ['KB','MB','GB','TB'];
+            let u = -1;
+            let val = bytes;
+            do { val /= thresh; ++u; } while (val >= thresh && u < units.length - 1);
+            return val.toFixed(val >= 100 ? 0 : val >= 10 ? 1 : 1) + ' ' + units[u];
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds || seconds < 0) return '';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            if (h) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            return `${m}:${String(s).padStart(2,'0')}`;
+        }
+
+        function extractVideoId(inputUrl) {
+            try {
+                if (!inputUrl) return '';
+                const u = new URL(inputUrl);
+                if (u.hostname.includes('youtu.be')) {
+                    return u.pathname.replace('/', '').split('?')[0];
+                }
+                if (u.hostname.includes('youtube.com')) {
+                    // Handle standard watch URLs and Shorts URLs
+                    const shortsMatch = u.pathname.match(/^\/shorts\/([\w-]{11})/);
+                    if (shortsMatch) return shortsMatch[1];
+                    return u.searchParams.get('v') || '';
+                }
+            } catch {}
+            // Fallback simple regex
+            const m = String(inputUrl).match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/);
+            return m ? m[1] : '';
+        }
+
+        function buildThumbCandidates(videoId) {
+            if (!videoId) return [];
+            return [
+                `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+                `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+                `https://i.ytimg.com/vi/${videoId}/default.jpg`,
+            ];
+        }
+
+        function ensureDownloadsSection() {
+            let dl = document.getElementById('downloads');
+            if (!dl) {
+                dl = document.createElement('div');
+                dl.className = 'downloads';
+                dl.id = 'downloads';
+                const h = document.createElement('h3');
+                h.textContent = 'Downloads';
+                const list = document.createElement('div');
+                list.id = 'downloads-list';
+                dl.appendChild(h);
+                dl.appendChild(list);
+                document.querySelector('.container').appendChild(dl);
+            }
+            return document.getElementById('downloads-list');
+        }
+
+        function addDownloadItem(kind, titleText) {
+            const list = ensureDownloadsSection();
+            const card = document.createElement('div');
+            card.className = 'dl-card';
+            const row = document.createElement('div');
+            row.className = 'dl-row';
+            const left = document.createElement('div');
+            left.className = 'dl-left';
+            const title = document.createElement('div');
+            title.className = 'dl-title';
+            title.textContent = titleText || (kind === 'audio' ? 'Audio' : 'Video');
+            const status = document.createElement('div');
+            status.className = 'dl-status';
+            status.textContent = 'Processing';
+            left.appendChild(title);
+            left.appendChild(status);
+            const pct = document.createElement('div');
+            pct.className = 'dl-status dl-pct';
+            pct.textContent = '0%';
+            row.appendChild(left);
+            row.appendChild(pct);
+            const bar = document.createElement('div');
+            bar.className = 'progressbar';
+            const fill = document.createElement('span');
+            bar.appendChild(fill);
+            card.appendChild(row);
+            card.appendChild(bar);
+            list.prepend(card);
+            // Scroll into view
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            startDotsOn(status, 'Processing');
+            return { card, title, status, pct, fill };
+        }
+
+        async function downloadQuality(url, quality) {
+            const err = document.getElementById('error');
+            const prog = document.getElementById('progress');
+            err.textContent = '';
+            prog.style.display = 'block';
+            prog.innerHTML = '<span class="spinner"></span>Processing… your download will start soon';
+            const dl = addDownloadItem('video', 'Video download');
+            try {
+                const start = await fetch('/start-download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, quality, type: 'video', title: document.getElementById('title').textContent }) });
+                const sdata = await start.json();
+                if (!start.ok || sdata.status !== 'success') {
+                    throw new Error(sdata.message || 'Failed to start');
+                }
+                const jobId = sdata.job_id;
+                await pollAndFetch(jobId, dl);
+            } catch (e) {
+                err.textContent = e.message || String(e);
+                stopDotsOn(dl.status);
+                dl.status.textContent = 'Failed';
+            } finally {
+                prog.style.display = 'none';
+            }
+        }
+
+        async function downloadAudio(url, abr) {
+            const err = document.getElementById('error');
+            const prog = document.getElementById('progress');
+            err.textContent = '';
+            prog.style.display = 'block';
+            prog.innerHTML = '<span class="spinner"></span>Processing… Downloading audio';
+            const dl = addDownloadItem('audio', 'Audio download');
+            try {
+                const start = await fetch('/start-download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, type: 'audio', abr, title: document.getElementById('title').textContent }) });
+                const sdata = await start.json();
+                if (!start.ok || sdata.status !== 'success') {
+                    throw new Error(sdata.message || 'Failed to start');
+                }
+                const jobId = sdata.job_id;
+                await pollAndFetch(jobId, dl);
+            } catch (e) {
+                err.textContent = e.message || String(e);
+                stopDotsOn(dl.status);
+                dl.status.textContent = 'Failed';
+            } finally {
+                prog.style.display = 'none';
+            }
+        }
+
+        async function pollAndFetch(jobId, dl) {
+            let filenameShown = false;
+            while (true) {
+                await new Promise(r => setTimeout(r, 700));
+                const res = await fetch('/job-status?id=' + encodeURIComponent(jobId));
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Status error');
+                if (data.filename && !filenameShown) {
+                    dl.title.textContent = data.filename;
+                    filenameShown = true;
+                }
+                const pct = Math.max(0, Math.min(100, data.progress || 0));
+                dl.fill.style.width = pct + '%';
+                dl.pct.textContent = pct + '%';
+                // Keep animated Processing... text until completion or error
+                if (data.status === 'error') {
+                    stopDotsOn(dl.status);
+                    dl.status.textContent = 'Failed';
+                }
+                if (data.status === 'ready' || data.status === 'completed') break;
+                if (data.status === 'error') throw new Error(data.message || 'Failed');
+            }
+            const fileRes = await fetch('/fetch-file?id=' + encodeURIComponent(jobId));
+            if (!fileRes.ok) {
+                const d = await fileRes.json().catch(() => ({}));
+                throw new Error(d.message || 'Failed to fetch file');
+            }
+            const cd = fileRes.headers.get('Content-Disposition') || '';
+            const filename = (cd.match(/filename="(.+?)"/) || [])[1] || 'download';
+            const blob = await fileRes.blob();
+            dl.fill.style.width = '100%';
+            dl.pct.textContent = '100%';
+            stopDotsOn(dl.status);
+            dl.status.textContent = 'Completed';
+            downloadBlob(blob, filename);
+        }
+
+        function startDotsOn(el, label) {
+            if (!el) return;
+            stopDotsOn(el);
+            let dots = 0;
+            function render() { el.textContent = label + '.'.repeat(dots); }
+            render();
+            el._dotsTimer = setInterval(() => { dots = (dots + 1) % 4; render(); }, 400);
+        }
+
+        function stopDotsOn(el) {
+            if (el && el._dotsTimer) { clearInterval(el._dotsTimer); el._dotsTimer = null; }
+        }
+
+        function onSubmit(ev) {
+            ev.preventDefault();
+            fetchInfo();
+        }
+
+        function onUrlInputDebounced() {
+            if (onUrlInputDebounced._timer) clearTimeout(onUrlInputDebounced._timer);
+            onUrlInputDebounced._timer = setTimeout(fetchInfo, 500);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('url').addEventListener('input', onUrlInputDebounced);
+        });
+
+        function startDots(label) {
+            const prog = document.getElementById('progress');
+            stopDots();
+            let dots = 0;
+            function render() { prog.textContent = label + '.'.repeat(dots); }
+            render();
+            prog._dotsTimer = setInterval(() => { dots = (dots + 1) % 4; render(); }, 400);
+        }
+
+        function stopDots() {
+            const prog = document.getElementById('progress');
+            if (prog && prog._dotsTimer) { clearInterval(prog._dotsTimer); prog._dotsTimer = null; }
+        }
+    </script>
+</head>
+<body>
+    
+    <div class="container">
+        <div class="card">
+            <h1 class="title">
+                <span class="yt-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg" role="img" focusable="false">
+                        <path fill="#FF0000" d="M23.5 6.2c-.3-1.1-1.1-1.9-2.1-2.2C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.5C1.6 4.3.8 5.1.5 6.2 0 8.1 0 12 0 12s0 3.9.5 5.8c.3 1.1 1.1 1.9 2.1 2.2 1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5c1-.3 1.8-1.1 2.1-2.2.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8z"/>
+                        <path fill="#FFFFFF" d="M9.75 8.5v7l6-3.5-6-3.5z"/>
+                    </svg>
+                </span>
+                YouTube Video Downloader
+            </h1>
+            <p class="sub">Simple, fast, and private.</p>
+            <form onsubmit="onSubmit(event)">
+                <div class="row" style="margin-bottom:12px;">
+                    <input id="url" type="url" placeholder="Paste YouTube video URL" autocomplete="off" required />
+                    <button id="btn" type="submit">Fetch</button>
+                </div>
+            </form>
+            <div id="videoinfo" class="video-info">
+                <div class="muted" id="uploader"></div>
+                <h3 id="title" style="margin:6px 0 8px 0;"></h3>
+                <div id="embed" class="embed"></div>
+                <div id="duration" class="duration"></div>
+                <div class="tabs">
+                    <button id="tab-video" class="tab-btn" type="button">Video</button>
+                    <button id="tab-audio" class="tab-btn" type="button">Audio</button>
+                </div>
+                <div id="qualities" class="qualities"></div>
+            </div>
+            <div id="progress" class="progress">Processing video… This may take a moment.</div>
+            <div id="error" class="error"></div>
+        </div>
+        <section class="features">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <img class="feature-icon" src="assets/fast.png" alt="Fast" />
+                    <div>
+                        <h3>Fast downloads</h3>
+                        <p>Optimized with yt-dlp and ffmpeg for speed and reliability.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img class="feature-icon" src="assets/secure.png" alt="Secure" />
+                    <div>
+                        <h3>Secure</h3>
+                        <p>Runs locally; no URLs or files stored on our servers.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img class="feature-icon" src="assets/quality.png" alt="Quality" />
+                    <div>
+                        <h3>Quality selection</h3>
+                        <p>Pick the resolution or audio bitrate that suits you.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
+
+
+

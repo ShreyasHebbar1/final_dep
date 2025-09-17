@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: youtube-downloader
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -k gthread --threads 8 --timeout 180 --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /healthz
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: TEMP_DIR
+        value: /tmp/temp_downloads
+    
+    # Install ffmpeg/ffprobe via apt
+    packages:
+      apt:
+        - ffmpeg
+
