@@ -4,7 +4,7 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: apt-get update && apt-get install -y ffmpeg && pip install -r requirements.txt
     startCommand: gunicorn -w 2 -k gthread --threads 8 --timeout 180 --bind 0.0.0.0:$PORT app:app
     healthCheckPath: /healthz
     envVars:
@@ -14,9 +14,3 @@ services:
         value: "0"
       - key: TEMP_DIR
         value: /tmp/temp_downloads
-    
-    # Install ffmpeg/ffprobe via apt
-    packages:
-      apt:
-        - ffmpeg
-
